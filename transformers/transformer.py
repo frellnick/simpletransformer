@@ -2,6 +2,7 @@
 Transformer
     Base class for transforms
 """
+import pandas as pd
 
 # Base Class
 class Transformer():
@@ -48,7 +49,10 @@ class Transformer():
             self.__report = report
 
 
+#####################
 ## Derived Classes ##
+#####################
+
 
 class SplitTransform(Transformer):
     def __init__(self, n=2, size=None, data: pd.DataFrame = None):
