@@ -3,6 +3,7 @@ Transformer
     Base class for transforms
 """
 import pandas as pd
+import numpy as np
 
 # Base Class
 class Transformer():
@@ -26,7 +27,8 @@ class Transformer():
             self.message = 'Nothing to Report'
         else:
             self.message = message
-        return data
+        
+        self.output = data
     
     @property
     def report(self):        
@@ -83,13 +85,13 @@ class SplitTransform(Transformer):
         breakpoints.insert(0, 0)
         breakpoints.pop()
             
-        print('Breakpoints: ', breakpoints)
+        # print('Breakpoints: ', breakpoints)  # DEBUG
             
         # Bin dataframe at breakpoints
         new_data = {}
         for index in range(len(breakpoints)):
             if index < len(breakpoints) - 1:
-                print('{}:{}'.format(breakpoints[index], breakpoints[index+1]))
+                # print('{}:{}'.format(breakpoints[index], breakpoints[index+1]))  # DEBUG
                 temp = data.iloc[breakpoints[index]:breakpoints[index+1]]
             else:
                 temp = data.iloc[breakpoints[index]:dlen]
@@ -102,6 +104,83 @@ class SplitTransform(Transformer):
         self.output_shape = {key: new_data[key].shape for key in new_data}
         message = f'Data successfully split into {len(new_data)} pieces'
         
-        print(len(new_data))
+        # print(len(new_data))  # DEBUG
         
-        super().transform(data=new_data, message=message)
+        return super().transform(data=new_data, message=message)
+
+
+class InsertNullTransform(Transformer):
+    def __init__(self, n=0, column=None, column_index=0, fraction=0.1, data = None):
+        super().__init__(name='insert_null')
+        self.transform(data=data, n=n, column=column, column_index=column_index, fraction=fraction)
+        
+    def transform(self, data, n, column, column_index, fraction):
+        # Standardize access to data
+        try:
+            new_data = self.standardize_data(data)
+            mod_data = new_data[n].copy()
+        except:
+            print('n is too large.  Pick an n < {}'.format(len(self.standardize_data(data))))
+            raise
+        
+        # Infer column selection
+        iloc_list = self.infer_column(mod_data, column, column_index)
+
+        # Replace fraction of values in mod_column with np.nan
+        mod_columns = self.inject_nan(
+            columns = mod_data.iloc[:, iloc_list],
+            fraction = fraction
+        )
+
+        # Update mod_data 
+        mod_data.iloc[:, iloc_list] = mod_columns
+        print(mod_data)
+        
+        # Replace dataset with modified dataset
+        new_data[n] = mod_data
+
+        # Create report components
+        self.input_shape = data.shape
+        self.output_shape = {key: new_data[key].shape for key in new_data}
+        message = f'Nulls successfully inserted into set {n}, column{iloc_list}'
+        
+        return super().transform(data=new_data, message=message)
+    
+    def standardize_data(self, data):
+        if type(data) == pd.DataFrame:
+            new_data = {0: data}
+        elif type(data) == dict:
+            new_data= data
+            
+        return new_data
+
+    def infer_column(self, data, column, column_index):
+        assert type(data) == pd.DataFrame, "Data must be type Pandas DataFrame for inference"
+        # Test All Columns Case
+        if column is None and column_index is None:
+            iloc_list = [True]*len(data.columns)
+            raise NotImplementedError
+        # Test Named Column(s) Case
+        elif column is not None:
+            raise NotImplementedError
+        # Test column_index case
+        elif column_index is not None:
+            iloc_list = [False] * len(data.columns)
+            if type(column_index) == int:
+                iloc_list = [column_index]
+            elif type(column_index) == list:
+                raise NotImplementedError
+                for index in column_index:
+                    iloc_list[index] = True
+        return iloc_list
+
+
+    def inject_nan(self, columns, fraction):
+        nulled_indices = np.random.choice(
+            a = range(len(columns)),
+            size = int(len(columns) * fraction),
+            replace = False
+        )
+        new_columns = columns.copy()
+        new_columns.iloc[nulled_indices] = np.nan
+        return new_columns

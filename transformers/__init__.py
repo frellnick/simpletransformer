@@ -1,1 +1,1 @@
-from .transformer import Transformer, SplitTransform
+from .transformer import Transformer, SplitTransform, InsertNullTransform
